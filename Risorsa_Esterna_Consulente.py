@@ -26,7 +26,7 @@ def load_config_from_bytes(data: bytes):
     return gruppi, defaults
 
 # ------------------------------------------------------------
-# Utility functions
+# Utility
 # ------------------------------------------------------------
 def auto_quote(fields, quotechar='"', predicate=lambda s: ' ' in s):
     out = []
@@ -39,9 +39,9 @@ def auto_quote(fields, quotechar='"', predicate=lambda s: ' ' in s):
     return out
 
 def normalize_name(s: str) -> str:
-    nfkd = unicodedata.normalize('NFKD', s)
-    ascii_str = nfkd.encode('ASCII', 'ignore').decode()
-    return ascii_str.replace(' ', '').replace("'", '').lower()
+    nfkd = unicodedata.normalize("NFKD", s)
+    ascii_str = nfkd.encode("ASCII", "ignore").decode()
+    return ascii_str.replace(" ", "").replace("'", "").lower()
 
 def formatta_data(data: str) -> str:
     for sep in ["-", "/"]:
@@ -54,7 +54,7 @@ def formatta_data(data: str) -> str:
     return data
 
 # ------------------------------------------------------------
-# Generazione SAMAccountName
+# Generazione SAM
 # ------------------------------------------------------------
 def genera_samaccountname(nome, cognome, secondo_nome="", secondo_cognome="", esterno=False):
     n, sn = normalize_name(nome), normalize_name(secondo_nome)
@@ -74,7 +74,7 @@ def genera_samaccountname(nome, cognome, secondo_nome="", secondo_cognome="", es
     return base[:limit] + suffix
 
 # ------------------------------------------------------------
-# Display name
+# Nomi
 # ------------------------------------------------------------
 def build_full_name(cognome, secondo_cognome, nome, secondo_nome, esterno=False):
     parts = [p for p in [cognome, secondo_cognome, nome, secondo_nome] if p]
@@ -106,30 +106,19 @@ if not config_file:
     st.warning("Caricare il file di configurazione.")
     st.stop()
 
-try:
-    gruppi, defaults = load_config_from_bytes(config_file.read())
-except Exception as e:
-    st.error(f"Errore lettura configurazione: {e}")
-    st.stop()
+gruppi, defaults = load_config_from_bytes(config_file.read())
 
-# Defaults
 ou_value = defaults.get("ou_default", "")
 department_default = defaults.get("department_default", "")
 description_default = defaults.get("description_default", "<PC>")
 company = defaults.get("company_default", "")
 inserimento_base = gruppi.get("esterna_consulente", "")
 inserimento_noemail = gruppi.get("esterna_consulente_No_email", "")
-
-o365_groups_raw = defaults.get("o365_groups", "").strip()
-o365_std = defaults.get("grp_o365_standard", "").strip()
-o365_team = defaults.get("grp_o365_teams", "").strip()
-o365_cop = defaults.get("grp_o365_copilot", "").strip()
-
-# ✅ NUOVO DEFAULT FOORBAN
+o365_groups_raw = defaults.get("o365_groups", "")
 grp_foorban = defaults.get("grp_foorban", "").strip()
 
 # ------------------------------------------------------------
-# Input UI
+# Input
 # ------------------------------------------------------------
 cognome = st.text_input("Cognome").strip().capitalize()
 secondo_cognome = st.text_input("Secondo Cognome").strip().capitalize()
@@ -138,23 +127,13 @@ secondo_nome = st.text_input("Secondo Nome").strip().capitalize()
 cf = st.text_input("Codice Fiscale").strip()
 telefono = st.text_input("Mobile").replace(" ", "")
 description = st.text_input("PC", description_default).strip()
-exp_date = st.text_input(
-    "Data di Fine (gg-mm-aaaa)",
-    defaults.get("expire_default", "30-06-2025")
-).strip()
+exp_date = st.text_input("Data di Fine (gg-mm-aaaa)", defaults.get("expire_default", "")).strip()
 
 email_flag = st.radio("Email Consip necessaria?", ["Sì", "No"]) == "Sì"
+custom_email = st.text_input("Email Personalizzata").strip() if not email_flag else ""
 
-if not email_flag:
-    custom_email = st.text_input("Email Personalizzata").strip()
-
-if email_flag:
-    profil_flag = st.checkbox("Profilazione SM?")
-    sm_lines = st.text_area("SM su quali va profilato").splitlines() if profil_flag else []
-else:
-    profil_flag = False
-    sm_lines = []
-
+profil_flag = st.checkbox("Profilazione SM?") if email_flag else False
+sm_lines = st.text_area("SM su quali va profilato").splitlines() if profil_flag else []
 
 # ------------------------------------------------------------
 # Template Mail
@@ -165,7 +144,6 @@ if email_flag and st.button("Template per Posta Elettronica"):
     upn = f"{sAM}@consip.it"
 
     st.markdown("Ciao.  \nRichiedo cortesemente la definizione di una casella di posta come sottoindicato.")
-
     st.markdown(f"""
 | Campo | Valore |
 |------|--------|
@@ -180,44 +158,36 @@ if email_flag and st.button("Template per Posta Elettronica"):
 
     st.markdown("Inviare batch di notifica migrazione mail a: imac@consip.it")
 
-    # ✅ BLOCCO FOORBAN
     if grp_foorban:
-        st.markdown(f"""
-Aggiungere utenza al gruppo Azure:
-
-**{grp_foorban}**
-""")
+        st.markdown(f"Aggiungere utenza al gruppo Azure:\n\n**{grp_foorban}**")
 
     if profil_flag and sm_lines:
         st.markdown("Profilare su SM:")
         for sm in sm_lines:
-            if sm.strip():
-                st.markdown(f"- {sm}")
+            st.markdown(f"- {sm}")
 
     st.markdown("Grazie  \nSaluti")
 
-
 # ------------------------------------------------------------
-# CSV
+# CSV + ANTEPRIME
 # ------------------------------------------------------------
 if st.button("Genera CSV Consulente"):
     sAM = genera_samaccountname(nome, cognome, secondo_nome, secondo_cognome, True)
     cn = build_full_name(cognome, secondo_cognome, nome, secondo_nome, True)
-    exp_fmt = formatta_data(exp_date)
-
     upn = f"{sAM}@consip.it"
+    exp_fmt = formatta_data(exp_date)
     mail = upn if email_flag else (custom_email or upn)
     mobile = f"+39 {telefono}" if telefono else ""
 
     inser_grp = inserimento_base if email_flag else inserimento_noemail
 
     row_user = [
-        sAM, "SI", ou_value, cn, cn, cn,
+        sAM,"SI",ou_value,cn,cn,cn,
         f"{nome} {secondo_nome}".strip(),
         f"{cognome} {secondo_cognome}".strip(),
-        cf, "", department_default, description,
-        "No", exp_fmt, upn, mail, mobile,
-        "", "", "", "", "", company
+        cf,"",department_default,description,
+        "No",exp_fmt,upn,mail,mobile,
+        "","", "", "", "", company
     ]
 
     row_comp = [
@@ -227,10 +197,7 @@ if st.button("Genera CSV Consulente"):
 
     profile_groups = []
     if o365_groups_raw:
-        for t in re.split(r"[;,]", o365_groups_raw):
-            if t.strip():
-                profile_groups.append(t.strip())
-
+        profile_groups.extend([g.strip() for g in re.split(r"[;,]", o365_groups_raw) if g.strip()])
     if inser_grp:
         profile_groups.append(inser_grp.strip())
 
@@ -238,12 +205,21 @@ if st.button("Genera CSV Consulente"):
     profile_row[0] = sAM
     profile_row[18] = ";".join(profile_groups)
 
+    # ✅ ANTEPRIME
+    st.subheader("📄 Anteprima CSV Utente")
+    st.dataframe(pd.DataFrame([row_user], columns=HEADER_USER), use_container_width=True)
+
+    st.subheader("💻 Anteprima CSV Computer")
+    st.dataframe(pd.DataFrame([row_comp], columns=HEADER_COMP), use_container_width=True)
+
+    st.subheader("🔐 Anteprima CSV Profilazione")
+    st.dataframe(pd.DataFrame([profile_row], columns=HEADER_USER), use_container_width=True)
+
     def make_csv(header, row):
         buf = io.StringIO()
         w = csv.writer(buf, quoting=csv.QUOTE_NONE, escapechar="\\")
         w.writerow(header)
         w.writerow(auto_quote(row))
-        buf.seek(0)
         return buf.getvalue()
 
     st.download_button("📥 CSV Utente", make_csv(HEADER_USER, row_user), f"{sAM}_utente.csv")
@@ -251,3 +227,4 @@ if st.button("Genera CSV Consulente"):
     st.download_button("📥 CSV Profilazione", make_csv(HEADER_USER, profile_row), f"{sAM}_profilazione.csv")
 
     st.success(f"✅ CSV generati per {sAM}")
+``
