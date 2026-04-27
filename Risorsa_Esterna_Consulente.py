@@ -155,6 +155,7 @@ else:
     profil_flag = False
     sm_lines = []
 
+
 # ------------------------------------------------------------
 # Template Mail
 # ------------------------------------------------------------
@@ -164,14 +165,17 @@ if email_flag and st.button("Template per Posta Elettronica"):
     upn = f"{sAM}@consip.it"
 
     st.markdown("Ciao.  \nRichiedo cortesemente la definizione di una casella di posta come sottoindicato.")
+
     st.markdown(f"""
-| Campo        | Valore |
-|-------------|--------|
+| Campo | Valore |
+|------|--------|
 | Tipo Utenza | Remota |
-| Utenza      | {sAM} |
-| Alias       | {sAM} |
-| Display     | {cn} |
-| e-mail      | {upn} |
+| Utenza | {sAM} |
+| Alias | {sAM} |
+| Display name | {cn} |
+| Common name | {cn} |
+| e-mail | {upn} |
+| e-mail secondaria | {upn} |
 """)
 
     st.markdown("Inviare batch di notifica migrazione mail a: imac@consip.it")
@@ -191,6 +195,7 @@ Aggiungere utenza al gruppo Azure:
                 st.markdown(f"- {sm}")
 
     st.markdown("Grazie  \nSaluti")
+
 
 # ------------------------------------------------------------
 # CSV
