@@ -227,4 +227,3 @@ if st.button("Genera CSV Consulente"):
     st.download_button("📥 CSV Profilazione", make_csv(HEADER_USER, profile_row), f"{sAM}_profilazione.csv")
 
     st.success(f"✅ CSV generati per {sAM}")
-``
