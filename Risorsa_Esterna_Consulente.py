@@ -12,18 +12,40 @@ import re
 def load_config_from_bytes(data: bytes):
     cfg = pd.read_excel(io.BytesIO(data), sheet_name="Consulente", engine="openpyxl")
 
+    # Normalizza NaN e tipi per evitare sorprese (NON cambia logica, solo robustezza input)
+    for col in ["Section", "Key/App", "Label/Gruppi/Value", "Tipo"]:
+        if col in cfg.columns:
+            cfg[col] = cfg[col].fillna("").astype(str).str.strip()
+
+    # --- InserimentoGruppi (come prima) ---
     grp_df = (
         cfg[cfg["Section"] == "InserimentoGruppi"][["Key/App", "Label/Gruppi/Value"]]
         .rename(columns={"Key/App": "app", "Label/Gruppi/Value": "gruppi"})
     )
     gruppi = dict(zip(grp_df["app"], grp_df["gruppi"].astype(str)))
 
+    # --- Defaults (come prima) ---
     def_df = (
         cfg[cfg["Section"] == "Defaults"][["Key/App", "Label/Gruppi/Value"]]
         .rename(columns={"Key/App": "key", "Label/Gruppi/Value": "value"})
     )
     defaults = dict(zip(def_df["key"], def_df["value"].astype(str)))
-    return gruppi, defaults
+
+    # --- NUOVO: estrazione dinamica di TUTTI i Defaults con Tipo = PEL ---
+    # Serve per il template Posta Elettronica (solo se Email Consip = Sì)
+    pel_items = []
+    if "Tipo" in cfg.columns:
+        pel_df = cfg[(cfg["Section"] == "Defaults") & (cfg["Tipo"].str.upper() == "PEL")][
+            ["Key/App", "Label/Gruppi/Value"]
+        ]
+        # Mantiene l'ordine presente nel foglio Excel
+        for _, r in pel_df.iterrows():
+            k = str(r["Key/App"]).strip()
+            v = str(r["Label/Gruppi/Value"]).strip()
+            if v:
+                pel_items.append((k, v))
+
+    return gruppi, defaults, pel_items
 
 # ------------------------------------------------------------
 # Utility
@@ -106,7 +128,7 @@ if not config_file:
     st.warning("Caricare il file di configurazione.")
     st.stop()
 
-gruppi, defaults = load_config_from_bytes(config_file.read())
+gruppi, defaults, pel_items = load_config_from_bytes(config_file.read())
 
 ou_value = defaults.get("ou_default", "")
 department_default = defaults.get("department_default", "")
@@ -115,7 +137,6 @@ company = defaults.get("company_default", "")
 inserimento_base = gruppi.get("esterna_consulente", "")
 inserimento_noemail = gruppi.get("esterna_consulente_No_email", "")
 o365_groups_raw = defaults.get("o365_groups", "")
-grp_foorban = defaults.get("grp_foorban", "").strip()
 
 # ------------------------------------------------------------
 # Input
@@ -158,8 +179,12 @@ if email_flag and st.button("Template per Posta Elettronica"):
 
     st.markdown("Inviare batch di notifica migrazione mail a: imac@consip.it")
 
-    if grp_foorban:
-        st.markdown(f"Aggiungere utenza al gruppo Azure:\n\n**{grp_foorban}**")
+    # ✅ NUOVO: stampa dinamica di TUTTI i Defaults con Tipo=PEL (ordine Excel)
+    # (vale SOLO qui, cioè SOLO quando Email Consip necessaria? == "Sì")
+    if pel_items:
+        st.markdown("Aggiungere utenza ai gruppi Azure:")
+        for _, v in pel_items:
+            st.markdown(f"**{v}**")
 
     if profil_flag and sm_lines:
         st.markdown("Profilare su SM:")
