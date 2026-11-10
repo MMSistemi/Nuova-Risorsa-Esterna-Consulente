@@ -1146,20 +1146,6 @@ if st.button(
             "Nessun gruppo EntraID previsto."
         )
 
-    if profilazione_sm and sm_lines:
-
-        entra_lines.append(
-            ""
-        )
-
-        entra_lines.append(
-            "Profilare su SM:"
-        )
-
-        entra_lines.extend(
-            sm_lines
-        )
-
     csv_entraid = (
         "\n".join(
             entra_lines
