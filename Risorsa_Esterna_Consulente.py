@@ -1007,7 +1007,7 @@ if st.button(
     # FILE 2 - CASELLA
     # ========================================================
     if email_flag:
-
+    
         casella_lines = [
             "Tipo Utenza --- Remota",
             f"Utenza --- {sam}",
@@ -1020,29 +1020,41 @@ if st.button(
                 f"{sam}@consipspa.mail.onmicrosoft.com"
             )
         ]
-
+    
+        # ----------------------------------------------------
+        # Eventuale profilazione SM
+        # ----------------------------------------------------
+        if profilazione_sm and sm_lines:
+    
+            casella_lines.append("")
+            casella_lines.append("Profilare su SM:")
+    
+            for sm in sm_lines:
+                casella_lines.append(
+                    f"- {sm}"
+                )
+    
         csv_casella = (
             "\n".join(
                 casella_lines
             )
             + "\n"
         )
-
+    
     else:
-
+    
         casella_lines = [
             "Casella Consip non richiesta",
             f"Utenza --- {sam}",
             f"Email esterna --- {custom_email}"
         ]
-
+    
         csv_casella = (
             "\n".join(
                 casella_lines
             )
             + "\n"
         )
-
     # ========================================================
     # FILE 3 - PROFILAZIONE GRUPPI AD
     # ========================================================
