@@ -1231,7 +1231,7 @@ if st.button(
     subject_giit = (
         "02 - Provisioning Utente "
         "(utenza/Casella/Profilazione) + "
-        "Profilazione Computer - "
+        "Modifica AD Computer - "
         f"{cn} → GIIT"
     )
 
