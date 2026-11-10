@@ -1248,11 +1248,8 @@ if st.button(
         "dei gruppi AD\n"
         f"4. {filename_entraid} per inserimento "
         "dei gruppi EntraID\n"
-        f"5. {filename_computer} per la profilazione "
-        "del Computer\n"
+        f"5. {filename_computer} per Aggiornamento Computer su AD con riferimenti utente, effettuare questa attività il giorno {data_inizio_output}. "
         f"\n"
-        f"L'attività relativa al file 5 deve essere "
-        f"effettuata il giorno {data_inizio_output}."
     )
 
     # ========================================================
