@@ -19,6 +19,7 @@ def load_config_from_bytes(data: bytes):
         engine="openpyxl"
     )
 
+    # Supporta entrambi i possibili nomi del foglio
     if "Consulente" in workbook:
         cfg = workbook["Consulente"]
     elif "Risorsa Esterna" in workbook:
@@ -26,6 +27,9 @@ def load_config_from_bytes(data: bytes):
     else:
         cfg = pd.DataFrame()
 
+    # --------------------------------------------------------
+    # Normalizzazione colonne
+    # --------------------------------------------------------
     if not cfg.empty:
 
         cfg = cfg.rename(
@@ -35,8 +39,13 @@ def load_config_from_bytes(data: bytes):
             }
         )
 
+        # Uniforma Tipo/TIPO
         if "Tipo" in cfg.columns and "TIPO" not in cfg.columns:
-            cfg = cfg.rename(columns={"Tipo": "TIPO"})
+            cfg = cfg.rename(
+                columns={
+                    "Tipo": "TIPO"
+                }
+            )
 
         for column in [
             "Section",
@@ -63,10 +72,16 @@ def load_config_from_bytes(data: bytes):
         and required_columns.issubset(cfg.columns)
     ):
 
+        # ----------------------------------------------------
+        # OU
+        # ----------------------------------------------------
         ou_df = cfg[
             cfg["Section"] == "OU"
         ][
-            ["Key/App", "Label/Gruppi/Value"]
+            [
+                "Key/App",
+                "Label/Gruppi/Value"
+            ]
         ].rename(
             columns={
                 "Key/App": "key",
@@ -75,13 +90,22 @@ def load_config_from_bytes(data: bytes):
         )
 
         ou_options = dict(
-            zip(ou_df["key"], ou_df["label"])
+            zip(
+                ou_df["key"],
+                ou_df["label"]
+            )
         )
 
+        # ----------------------------------------------------
+        # Inserimento gruppi
+        # ----------------------------------------------------
         gruppi_df = cfg[
             cfg["Section"] == "InserimentoGruppi"
         ][
-            ["Key/App", "Label/Gruppi/Value"]
+            [
+                "Key/App",
+                "Label/Gruppi/Value"
+            ]
         ].rename(
             columns={
                 "Key/App": "app",
@@ -90,13 +114,22 @@ def load_config_from_bytes(data: bytes):
         )
 
         gruppi = dict(
-            zip(gruppi_df["app"], gruppi_df["gruppi"])
+            zip(
+                gruppi_df["app"],
+                gruppi_df["gruppi"]
+            )
         )
 
+        # ----------------------------------------------------
+        # Defaults
+        # ----------------------------------------------------
         defaults_df = cfg[
             cfg["Section"] == "Defaults"
         ][
-            ["Key/App", "Label/Gruppi/Value"]
+            [
+                "Key/App",
+                "Label/Gruppi/Value"
+            ]
         ].rename(
             columns={
                 "Key/App": "key",
@@ -105,7 +138,10 @@ def load_config_from_bytes(data: bytes):
         )
 
         defaults = dict(
-            zip(defaults_df["key"], defaults_df["value"])
+            zip(
+                defaults_df["key"],
+                defaults_df["value"]
+            )
         )
 
     else:
@@ -113,6 +149,10 @@ def load_config_from_bytes(data: bytes):
         gruppi = {}
         defaults = {}
 
+    # --------------------------------------------------------
+    # Estrazione Defaults con TIPO = PEL
+    # Mantiene l'ordine del file Excel
+    # --------------------------------------------------------
     pel_items = []
 
     if (
@@ -125,16 +165,26 @@ def load_config_from_bytes(data: bytes):
             (cfg["Section"] == "Defaults")
             & (cfg["TIPO"].str.upper() == "PEL")
         ][
-            ["Key/App", "Label/Gruppi/Value"]
+            [
+                "Key/App",
+                "Label/Gruppi/Value"
+            ]
         ]
 
         for _, row in pel_df.iterrows():
 
-            key = str(row["Key/App"]).strip()
-            value = str(row["Label/Gruppi/Value"]).strip()
+            key = str(
+                row["Key/App"]
+            ).strip()
+
+            value = str(
+                row["Label/Gruppi/Value"]
+            ).strip()
 
             if value:
-                pel_items.append((key, value))
+                pel_items.append(
+                    (key, value)
+                )
 
     return (
         ou_options,
@@ -152,7 +202,9 @@ st.set_page_config(
     layout="wide"
 )
 
-st.title("1.3 Risorsa Esterna: Consulente")
+st.title(
+    "1.3 Risorsa Esterna: Consulente"
+)
 
 
 # ------------------------------------------------------------
@@ -162,16 +214,19 @@ config_file = st.file_uploader(
     "Carica il file di configurazione (config.xlsx)",
     type=["xlsx"],
     help=(
-        "Il file deve contenere il foglio 'Consulente' "
-        "con le colonne Section, Key/App, "
-        "Label/Gruppi/Value e TIPO."
+        "Il file deve contenere il foglio "
+        "'Consulente' con le colonne Section, "
+        "Key/App, Label/Gruppi/Value e TIPO."
     )
 )
 
 if not config_file:
+
     st.warning(
-        "Caricare il file di configurazione per continuare."
+        "Caricare il file di configurazione "
+        "per continuare."
     )
+
     st.stop()
 
 
@@ -180,17 +235,22 @@ if not config_file:
     gruppi,
     defaults,
     pel_items
-) = load_config_from_bytes(config_file.read())
+) = load_config_from_bytes(
+    config_file.read()
+)
 
 
 # ------------------------------------------------------------
-# Funzioni di configurazione
+# Funzioni di gestione configurazione
 # ------------------------------------------------------------
 def split_values(value):
 
     return [
         item.strip()
-        for item in re.split(r"[;,]", str(value))
+        for item in re.split(
+            r"[;,]",
+            str(value)
+        )
         if item.strip()
     ]
 
@@ -210,7 +270,7 @@ def unique_in_order(values):
 
 
 # ------------------------------------------------------------
-# Gruppi O365
+# Gruppi O365 letti dalle chiavi grp_o365_*
 # ------------------------------------------------------------
 o365_groups = []
 
@@ -222,6 +282,7 @@ for key, value in defaults.items():
 
         for group in split_values(value):
 
+            # Correzione automatica nel caso manchi la O iniziale
             if group.startswith("365 "):
                 group = "O" + group
 
@@ -229,11 +290,17 @@ for key, value in defaults.items():
                 o365_groups.append(group)
 
 
-old_o365_groups = defaults.get("o365_groups", "")
+# Compatibilità con la vecchia chiave o365_groups
+old_o365_groups = defaults.get(
+    "o365_groups",
+    ""
+)
 
 if old_o365_groups:
 
-    for group in split_values(old_o365_groups):
+    for group in split_values(
+        old_o365_groups
+    ):
 
         if group.startswith("365 "):
             group = "O" + group
@@ -247,11 +314,17 @@ if old_o365_groups:
 # ------------------------------------------------------------
 def normalize_name(value: str) -> str:
 
-    normalized = unicodedata.normalize("NFKD", value)
+    normalized = unicodedata.normalize(
+        "NFKD",
+        value
+    )
 
     ascii_value = (
         normalized
-        .encode("ASCII", "ignore")
+        .encode(
+            "ASCII",
+            "ignore"
+        )
         .decode()
     )
 
@@ -267,8 +340,10 @@ def formatta_data(data: str) -> str:
 
     data = str(data).strip()
 
-    for formato in ["%d-%m-%Y", "%d/%m/%Y"]:
-
+    for formato in [
+        "%d-%m-%Y",
+        "%d/%m/%Y"
+    ]:
         try:
 
             data_convertita = datetime.strptime(
@@ -276,7 +351,11 @@ def formatta_data(data: str) -> str:
                 formato
             )
 
-            data_convertita += timedelta(days=1)
+            # La data di scadenza viene impostata
+            # al giorno successivo
+            data_convertita += timedelta(
+                days=1
+            )
 
             return data_convertita.strftime(
                 "%m/%d/%Y 00:00"
@@ -296,25 +375,53 @@ def genera_samaccountname(
     esterno=False
 ):
 
-    n = normalize_name(nome)
-    sn = normalize_name(secondo_nome)
-    c = normalize_name(cognome)
-    sc = normalize_name(secondo_cognome)
+    nome_normalizzato = normalize_name(
+        nome
+    )
+
+    secondo_nome_normalizzato = normalize_name(
+        secondo_nome
+    )
+
+    cognome_normalizzato = normalize_name(
+        cognome
+    )
+
+    secondo_cognome_normalizzato = normalize_name(
+        secondo_cognome
+    )
 
     suffix = ".ext" if esterno else ""
+
+    # Per gli esterni la parte prima di .ext
+    # deve essere al massimo di 16 caratteri
     limit = 16 if esterno else 20
 
-    candidate_1 = f"{n}{sn}.{c}{sc}"
+    candidate_1 = (
+        f"{nome_normalizzato}"
+        f"{secondo_nome_normalizzato}."
+        f"{cognome_normalizzato}"
+        f"{secondo_cognome_normalizzato}"
+    )
 
     if len(candidate_1) <= limit:
         return candidate_1 + suffix
 
-    candidate_2 = f"{n[:1]}{sn[:1]}.{c}{sc}"
+    candidate_2 = (
+        f"{nome_normalizzato[:1]}"
+        f"{secondo_nome_normalizzato[:1]}."
+        f"{cognome_normalizzato}"
+        f"{secondo_cognome_normalizzato}"
+    )
 
     if len(candidate_2) <= limit:
         return candidate_2 + suffix
 
-    base = f"{n[:1]}{sn[:1]}.{c}"
+    base = (
+        f"{nome_normalizzato[:1]}"
+        f"{secondo_nome_normalizzato[:1]}."
+        f"{cognome_normalizzato}"
+    )
 
     return base[:limit] + suffix
 
@@ -338,7 +445,9 @@ def build_full_name(
         if part
     ]
 
-    full_name = " ".join(parts)
+    full_name = " ".join(
+        parts
+    )
 
     if esterno:
         full_name += " (esterno)"
@@ -365,10 +474,22 @@ def build_name_without_external_label(
     )
 
 
+# ------------------------------------------------------------
+# Costruzione gruppi Entra ID
+# ------------------------------------------------------------
 def build_entraid_groups(
     pel_items,
     email_consip
 ):
+
+    """
+    Regole:
+    - dl_standard e dl_vip non sono gruppi Entra ID;
+    - pillole viene escluso;
+    - vengono mantenuti ordine e valori del config;
+    - i gruppi vengono generati solo se è richiesta
+      la casella Email Consip.
+    """
 
     if not email_consip:
         return []
@@ -390,9 +511,13 @@ def build_entraid_groups(
         ):
             continue
 
-        entra_groups.extend(split_values(value))
+        entra_groups.extend(
+            split_values(value)
+        )
 
-    return unique_in_order(entra_groups)
+    return unique_in_order(
+        entra_groups
+    )
 
 
 # ------------------------------------------------------------
@@ -404,6 +529,11 @@ def auto_quote(
     predicate=lambda value: " " in value
 ):
 
+    """
+    Racchiude tra doppi apici ogni valore
+    contenente almeno uno spazio.
+    """
+
     output = []
 
     for field in fields:
@@ -411,14 +541,30 @@ def auto_quote(
         value = str(field)
 
         if predicate(value):
-            output.append(f'{quotechar}{value}{quotechar}')
+
+            output.append(
+                f'{quotechar}{value}{quotechar}'
+            )
+
         else:
-            output.append(value)
+
+            output.append(
+                value
+            )
 
     return output
 
 
-def prepara_csv_standard(row, header):
+def prepara_csv_standard(
+    row,
+    header
+):
+
+    """
+    Mantiene la costruzione precedente:
+    ogni campo contenente almeno uno spazio
+    viene racchiuso tra doppi apici.
+    """
 
     buffer = io.StringIO()
 
@@ -429,8 +575,19 @@ def prepara_csv_standard(row, header):
         lineterminator="\n"
     )
 
-    writer.writerow(header)
-    writer.writerow(auto_quote(row))
+    quoted_row = auto_quote(
+        row,
+        quotechar='"',
+        predicate=lambda value: " " in value
+    )
+
+    writer.writerow(
+        header
+    )
+
+    writer.writerow(
+        quoted_row
+    )
 
     return buffer.getvalue()
 
@@ -480,7 +637,7 @@ HEADER_COMPUTER = [
 
 
 # ------------------------------------------------------------
-# Valori configurazione
+# Valori di configurazione
 # ------------------------------------------------------------
 department_default = defaults.get(
     "department_default",
@@ -506,7 +663,9 @@ expire_default = defaults.get(
 # ------------------------------------------------------------
 # Modulo inserimento consulente
 # ------------------------------------------------------------
-st.subheader("Modulo Inserimento Nuovo Consulente")
+st.subheader(
+    "Modulo Inserimento Nuovo Consulente"
+)
 
 colonna_1, colonna_2 = st.columns(2)
 
@@ -514,25 +673,33 @@ colonna_1, colonna_2 = st.columns(2)
 with colonna_1:
 
     cognome = (
-        st.text_input("Cognome")
+        st.text_input(
+            "Cognome"
+        )
         .strip()
         .title()
     )
 
     secondo_cognome = (
-        st.text_input("Secondo Cognome")
+        st.text_input(
+            "Secondo Cognome"
+        )
         .strip()
         .title()
     )
 
     nome = (
-        st.text_input("Nome")
+        st.text_input(
+            "Nome"
+        )
         .strip()
         .title()
     )
 
     secondo_nome = (
-        st.text_input("Secondo Nome")
+        st.text_input(
+            "Secondo Nome"
+        )
         .strip()
         .title()
     )
@@ -542,7 +709,9 @@ with colonna_1:
     ).strip()
 
     numero_telefono = (
-        st.text_input("Mobile (+39 già inserito)")
+        st.text_input(
+            "Mobile (+39 già inserito)"
+        )
         .replace(" ", "")
         .strip()
     )
@@ -571,7 +740,10 @@ with colonna_2:
     email_flag = (
         st.radio(
             "Email Consip necessaria?",
-            ["Sì", "No"],
+            [
+                "Sì",
+                "No"
+            ],
             horizontal=True
         )
         == "Sì"
@@ -584,6 +756,7 @@ with colonna_2:
         ).strip()
 
     else:
+
         custom_email = ""
 
 
@@ -591,20 +764,27 @@ with colonna_2:
 # Tipologia utente e OU
 # ------------------------------------------------------------
 ou_values = (
-    list(ou_options.values())
+    list(
+        ou_options.values()
+    )
     if ou_options
     else []
 )
 
 default_ou = defaults.get(
     "ou_default",
-    ou_values[0] if ou_values else ""
+    ou_values[0]
+    if ou_values
+    else ""
 )
 
 index_default = 0
 
 if default_ou in ou_values:
-    index_default = ou_values.index(default_ou)
+
+    index_default = ou_values.index(
+        default_ou
+    )
 
 
 if ou_values:
@@ -617,7 +797,11 @@ if ou_values:
 
     selected_key = list(
         ou_options.keys()
-    )[ou_values.index(label_ou)]
+    )[
+        ou_values.index(
+            label_ou
+        )
+    ]
 
     ou_value = ou_options.get(
         selected_key,
@@ -638,7 +822,9 @@ else:
 # Profilazione SM
 # ------------------------------------------------------------
 profilazione_sm = (
-    st.checkbox("Profilazione SM?")
+    st.checkbox(
+        "Profilazione SM?"
+    )
     if email_flag
     else False
 )
@@ -654,11 +840,12 @@ if profilazione_sm:
     ]
 
 else:
+
     sm_lines = []
 
 
 # ------------------------------------------------------------
-# Generazione
+# Generazione flusso
 # ------------------------------------------------------------
 if st.button(
     "Genera CSV Consulente",
@@ -669,22 +856,36 @@ if st.button(
     # Validazioni
     # --------------------------------------------------------
     if not cognome or not nome:
-        st.error("Inserire almeno Cognome e Nome.")
+
+        st.error(
+            "Inserire almeno Cognome e Nome."
+        )
+
         st.stop()
 
     if not manager:
-        st.error("Inserire il Manager / Referente.")
+
+        st.error(
+            "Inserire il Manager / Referente."
+        )
+
         st.stop()
 
     if not data_inizio:
-        st.error("Inserire la Data inizio.")
+
+        st.error(
+            "Inserire la Data inizio."
+        )
+
         st.stop()
 
     if not email_flag and not custom_email:
+
         st.error(
             "Se Email Consip non è necessaria, "
             "inserire l'Email personalizzata."
         )
+
         st.stop()
 
     # --------------------------------------------------------
@@ -713,12 +914,23 @@ if st.button(
         secondo_nome
     )
 
-    given_name = f"{nome} {secondo_nome}".strip()
-    surname = f"{cognome} {secondo_cognome}".strip()
+    given_name = (
+        f"{nome} {secondo_nome}"
+        .strip()
+    )
+
+    surname = (
+        f"{cognome} {secondo_cognome}"
+        .strip()
+    )
 
     upn = f"{sam}@consip.it"
 
-    mail = upn if email_flag else custom_email
+    mail = (
+        upn
+        if email_flag
+        else custom_email
+    )
 
     mobile = (
         f"+39 {numero_telefono}"
@@ -726,13 +938,28 @@ if st.button(
         else ""
     )
 
-    expire_date = formatta_data(data_fine)
+    expire_date = formatta_data(
+        data_fine
+    )
 
-    pc_asset = description or "<PC>"
-    manager_output = manager or "<Manager>"
-    data_inizio_output = data_inizio or "<data inizio>"
+    pc_asset = (
+        description
+        or "<PC>"
+    )
 
-    persona_nome_file = nome_senza_esterno
+    manager_output = (
+        manager
+        or "<Manager>"
+    )
+
+    data_inizio_output = (
+        data_inizio
+        or "<data inizio>"
+    )
+
+    persona_nome_file = (
+        nome_senza_esterno
+    )
 
     persona_nome_underscore = "_".join(
         part
@@ -797,15 +1024,28 @@ if st.button(
             )
         ]
 
+        # ----------------------------------------------------
+        # Eventuale profilazione SM
+        # ----------------------------------------------------
         if profilazione_sm and sm_lines:
 
             casella_lines.append("")
-            casella_lines.append("Profilare su SM:")
+            casella_lines.append(
+                "Profilare su SM:"
+            )
 
             for sm in sm_lines:
-                casella_lines.append(f"- {sm}")
 
-        csv_casella = "\n".join(casella_lines) + "\n"
+                casella_lines.append(
+                    f"- {sm}"
+                )
+
+        csv_casella = (
+            "\n".join(
+                casella_lines
+            )
+            + "\n"
+        )
 
     else:
 
@@ -815,10 +1055,15 @@ if st.button(
             f"Email esterna --- {custom_email}"
         ]
 
-        csv_casella = "\n".join(casella_lines) + "\n"
+        csv_casella = (
+            "\n".join(
+                casella_lines
+            )
+            + "\n"
+        )
 
     # ========================================================
-    # FILE 3 - GRUPPI AD
+    # FILE 3 - PROFILAZIONE GRUPPI AD
     # ========================================================
     if email_flag:
 
@@ -849,22 +1094,34 @@ if st.button(
         if group.startswith("365 "):
             group = "O" + group
 
-        gruppi_consulente.append(group)
+        gruppi_consulente.append(
+            group
+        )
 
     gruppi_ad = unique_in_order(
-        o365_groups + gruppi_consulente
+        o365_groups
+        + gruppi_consulente
     )
 
-    row_gruppi_ad = [""] * len(HEADER_UTENTE)
+    row_gruppi_ad = [
+        ""
+    ] * len(
+        HEADER_UTENTE
+    )
+
     row_gruppi_ad[0] = sam
 
-    inserimento_gruppo_index = HEADER_UTENTE.index(
-        "InserimentoGruppo"
+    inserimento_gruppo_index = (
+        HEADER_UTENTE.index(
+            "InserimentoGruppo"
+        )
     )
 
     row_gruppi_ad[
         inserimento_gruppo_index
-    ] = ";".join(gruppi_ad)
+    ] = ";".join(
+        gruppi_ad
+    )
 
     csv_gruppi_ad = prepara_csv_standard(
         row_gruppi_ad,
@@ -872,7 +1129,7 @@ if st.button(
     )
 
     # ========================================================
-    # FILE 4 - GRUPPI ENTRA ID
+    # FILE 4 - PROFILAZIONE GRUPPI ENTRA ID
     # ========================================================
     gruppi_entraid = build_entraid_groups(
         pel_items,
@@ -887,17 +1144,27 @@ if st.button(
     ]
 
     if gruppi_entraid:
-        entra_lines.extend(gruppi_entraid)
+
+        entra_lines.extend(
+            gruppi_entraid
+        )
+
     else:
+
         entra_lines.append(
             "Nessun gruppo EntraID previsto."
         )
 
-    csv_entraid = "\n".join(entra_lines) + "\n"
+    csv_entraid = (
+        "\n".join(
+            entra_lines
+        )
+        + "\n"
+    )
 
     # ========================================================
     # FILE 5 - COMPUTER
-    # Competenza GITT
+    # Competenza GIIT
     # ========================================================
     row_computer = [
         pc_asset,
@@ -944,7 +1211,7 @@ if st.button(
     )
 
     # ========================================================
-    # 01 - GSI
+    # 01 - ASSEGNAZIONE ASSET - GSI
     # ========================================================
     subject_gsi = (
         "01 - Assegnazione Asset - "
@@ -959,11 +1226,12 @@ if st.button(
     )
 
     # ========================================================
-    # 02 - GIIT
+    # 02 - PROVISIONING UTENTE E COMPUTER - GIIT
     # ========================================================
     subject_giit = (
         "02 - Provisioning Utente "
-        "(utenza/Casella/Profilazione) - "
+        "(utenza/Casella/Profilazione) + "
+        "Profilazione Computer - "
         f"{cn} → GIIT"
     )
 
@@ -979,31 +1247,19 @@ if st.button(
         f"3. {filename_gruppi_ad} per inserimento "
         "dei gruppi AD\n"
         f"4. {filename_entraid} per inserimento "
-        "dei gruppi EntraID"
+        "dei gruppi EntraID\n"
+        f"5. {filename_computer} per la profilazione "
+        "del Computer\n"
+        f"\n"
+        f"L'attività relativa al file 5 deve essere "
+        f"effettuata il giorno {data_inizio_output}."
     )
 
     # ========================================================
-    # 03 - GITT
-    # FILE COMPUTER DA ELABORARE ALLA DATA DI INIZIO
-    # ========================================================
-    subject_gitt = (
-        "03 - Profilazione Computer - "
-        f"{cn} → GITT"
-    )
-
-    message_gitt = (
-        "Ciao,\n"
-        f"si richiede di elaborare il file "
-        f"{filename_computer} "
-        f"il giorno {data_inizio_output}."
-    )
-
-    # ========================================================
-    # 04 - GHDW
-    # Provisioning PC + Firma Asset
+    # 03 - PROVISIONING PC E FIRMA ASSET - GHDW
     # ========================================================
     subject_ghdw = (
-        "04 - Provisioning PC e Firma Asset - "
+        "03 - Provisioning PC e Firma Asset - "
         f"{cn} → GHDW"
     )
 
@@ -1034,9 +1290,6 @@ if st.button(
         subject_giit,
         message_giit,
 
-        subject_gitt,
-        message_gitt,
-
         subject_ghdw,
         message_ghdw
     ]
@@ -1051,7 +1304,7 @@ if st.button(
     )
 
     # ========================================================
-    # CREAZIONE ZIP
+    # CREAZIONE BUNDLE ZIP
     # ========================================================
     zip_buffer = io.BytesIO()
 
@@ -1099,25 +1352,43 @@ if st.button(
     )
 
     # ========================================================
-    # VISUALIZZAZIONE
+    # VISUALIZZAZIONE FLUSSO
     # ========================================================
 
-    # --------------------------------------------------------
+    # ========================================================
     # 01 - GSI
-    # --------------------------------------------------------
-    st.subheader(subject_gsi)
-    st.text(message_gsi)
+    # ========================================================
+    st.subheader(
+        subject_gsi
+    )
+
+    st.text(
+        message_gsi
+    )
+
     st.divider()
 
-    # --------------------------------------------------------
+    # ========================================================
     # 02 - GIIT
+    # ========================================================
+    st.subheader(
+        subject_giit
+    )
+
+    st.text(
+        message_giit
+    )
+
+    st.markdown(
+        "**File di competenza GIIT:**"
+    )
+
     # --------------------------------------------------------
-    st.subheader(subject_giit)
-    st.text(message_giit)
-
-    st.markdown("**File di competenza GIIT:**")
-
-    st.markdown(f"**1. {filename_utente}**")
+    # File 1 - Utenza
+    # --------------------------------------------------------
+    st.markdown(
+        f"**1. {filename_utente}**"
+    )
 
     st.dataframe(
         pd.DataFrame(
@@ -1135,8 +1406,16 @@ if st.button(
         key="download_utente"
     )
 
-    st.markdown(f"**2. {filename_casella}**")
-    st.text(csv_casella)
+    # --------------------------------------------------------
+    # File 2 - Casella
+    # --------------------------------------------------------
+    st.markdown(
+        f"**2. {filename_casella}**"
+    )
+
+    st.text(
+        csv_casella
+    )
 
     st.download_button(
         "Scarica 2 - Casella",
@@ -1146,7 +1425,12 @@ if st.button(
         key="download_casella"
     )
 
-    st.markdown(f"**3. {filename_gruppi_ad}**")
+    # --------------------------------------------------------
+    # File 3 - Gruppi AD
+    # --------------------------------------------------------
+    st.markdown(
+        f"**3. {filename_gruppi_ad}**"
+    )
 
     st.dataframe(
         pd.DataFrame(
@@ -1164,8 +1448,16 @@ if st.button(
         key="download_gruppi_ad"
     )
 
-    st.markdown(f"**4. {filename_entraid}**")
-    st.text(csv_entraid)
+    # --------------------------------------------------------
+    # File 4 - Gruppi Entra ID
+    # --------------------------------------------------------
+    st.markdown(
+        f"**4. {filename_entraid}**"
+    )
+
+    st.text(
+        csv_entraid
+    )
 
     st.download_button(
         "Scarica 4 - Gruppi Entra ID",
@@ -1175,30 +1467,17 @@ if st.button(
         key="download_entraid"
     )
 
-    st.markdown("**Bundle completo del provisioning:**")
-
-    st.download_button(
-        "📦 Scarica bundle completo ZIP",
-        data=zip_buffer.getvalue(),
-        file_name=bundle_name,
-        mime="application/zip",
-        key="download_bundle"
+    # --------------------------------------------------------
+    # File 5 - Computer
+    # Sempre nello stesso punto 02 e di competenza GIIT
+    # --------------------------------------------------------
+    st.markdown(
+        f"**5. {filename_computer}**"
     )
 
-    st.divider()
-
-    # --------------------------------------------------------
-    # 03 - GITT
-    # --------------------------------------------------------
-    st.subheader(subject_gitt)
-    st.text(message_gitt)
-
-    st.markdown("**File di competenza GITT:**")
-    st.markdown(f"**5. {filename_computer}**")
-
     st.info(
-        f"Il file deve essere elaborato "
-        f"il giorno {data_inizio_output}."
+        f"Il file è di competenza GIIT e deve essere "
+        f"elaborato il giorno {data_inizio_output}."
     )
 
     st.dataframe(
@@ -1217,13 +1496,33 @@ if st.button(
         key="download_computer"
     )
 
+    # --------------------------------------------------------
+    # Bundle completo
+    # --------------------------------------------------------
+    st.markdown(
+        "**Bundle completo del provisioning:**"
+    )
+
+    st.download_button(
+        "📦 Scarica bundle completo ZIP",
+        data=zip_buffer.getvalue(),
+        file_name=bundle_name,
+        mime="application/zip",
+        key="download_bundle"
+    )
+
     st.divider()
 
-    # --------------------------------------------------------
-    # 04 - GHDW
-    # --------------------------------------------------------
-    st.subheader(subject_ghdw)
-    st.text(message_ghdw)
+    # ========================================================
+    # 03 - GHDW
+    # ========================================================
+    st.subheader(
+        subject_ghdw
+    )
+
+    st.text(
+        message_ghdw
+    )
 
     st.success(
         f"Flusso completo generato correttamente per '{sam}'."
