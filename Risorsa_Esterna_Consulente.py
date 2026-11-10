@@ -19,7 +19,6 @@ def load_config_from_bytes(data: bytes):
         engine="openpyxl"
     )
 
-    # Supporta sia "Consulente" sia un eventuale nome alternativo
     if "Consulente" in workbook:
         cfg = workbook["Consulente"]
     elif "Risorsa Esterna" in workbook:
@@ -39,7 +38,6 @@ def load_config_from_bytes(data: bytes):
             }
         )
 
-        # Uniforma Tipo/TIPO
         if "Tipo" in cfg.columns and "TIPO" not in cfg.columns:
             cfg = cfg.rename(
                 columns={
@@ -151,7 +149,6 @@ def load_config_from_bytes(data: bytes):
 
     # --------------------------------------------------------
     # Estrazione righe Defaults con TIPO = PEL
-    # Mantiene l'ordine del file Excel
     # --------------------------------------------------------
     pel_items = []
 
@@ -282,7 +279,6 @@ for key, value in defaults.items():
 
         for group in split_values(value):
 
-            # Corregge automaticamente "365 ..." in "O365 ..."
             if group.startswith("365 "):
                 group = "O" + group
 
@@ -290,7 +286,7 @@ for key, value in defaults.items():
                 o365_groups.append(group)
 
 
-# Compatibilità con la vecchia chiave o365_groups
+# Compatibilità con vecchia chiave o365_groups
 old_o365_groups = defaults.get(
     "o365_groups",
     ""
@@ -351,8 +347,6 @@ def formatta_data(data: str) -> str:
                 formato
             )
 
-            # Mantiene la logica precedente:
-            # scadenza impostata al giorno successivo
             data_convertita += timedelta(
                 days=1
             )
@@ -393,8 +387,6 @@ def genera_samaccountname(
 
     suffix = ".ext" if esterno else ""
 
-    # Per gli esterni la parte prima di .ext
-    # deve essere al massimo di 16 caratteri
     limit = 16 if esterno else 20
 
     candidate_1 = (
@@ -482,15 +474,6 @@ def build_entraid_groups(
     email_consip
 ):
 
-    """
-    Regole:
-    - dl_standard e dl_vip non sono gruppi Entra ID;
-    - pillole viene escluso;
-    - vengono mantenuti ordine e valori del config;
-    - i gruppi vengono generati solo se è richiesta
-      la casella Email Consip.
-    """
-
     if not email_consip:
         return []
 
@@ -529,11 +512,6 @@ def auto_quote(
     predicate=lambda value: " " in value
 ):
 
-    """
-    Racchiude tra doppi apici ogni valore
-    contenente almeno uno spazio.
-    """
-
     output = []
 
     for field in fields:
@@ -547,6 +525,7 @@ def auto_quote(
             )
 
         else:
+
             output.append(
                 value
             )
@@ -558,12 +537,6 @@ def prepara_csv_standard(
     row,
     header
 ):
-
-    """
-    Mantiene la costruzione precedente:
-    ogni campo contenente almeno uno spazio
-    viene racchiuso tra doppi apici.
-    """
 
     buffer = io.StringIO()
 
@@ -636,7 +609,7 @@ HEADER_COMPUTER = [
 
 
 # ------------------------------------------------------------
-# Valori di configurazione
+# Valori configurazione
 # ------------------------------------------------------------
 department_default = defaults.get(
     "department_default",
@@ -666,40 +639,31 @@ st.subheader(
     "Modulo Inserimento Nuovo Consulente"
 )
 
-
 colonna_1, colonna_2 = st.columns(2)
 
 
 with colonna_1:
 
     cognome = (
-        st.text_input(
-            "Cognome"
-        )
+        st.text_input("Cognome")
         .strip()
         .title()
     )
 
     secondo_cognome = (
-        st.text_input(
-            "Secondo Cognome"
-        )
+        st.text_input("Secondo Cognome")
         .strip()
         .title()
     )
 
     nome = (
-        st.text_input(
-            "Nome"
-        )
+        st.text_input("Nome")
         .strip()
         .title()
     )
 
     secondo_nome = (
-        st.text_input(
-            "Secondo Nome"
-        )
+        st.text_input("Secondo Nome")
         .strip()
         .title()
     )
@@ -756,6 +720,7 @@ with colonna_2:
         ).strip()
 
     else:
+
         custom_email = ""
 
 
@@ -844,7 +809,7 @@ else:
 
 
 # ------------------------------------------------------------
-# Generazione flusso
+# Generazione
 # ------------------------------------------------------------
 if st.button(
     "Genera CSV Consulente",
@@ -914,13 +879,11 @@ if st.button(
     )
 
     given_name = (
-        f"{nome} {secondo_nome}"
-        .strip()
+        f"{nome} {secondo_nome}".strip()
     )
 
     surname = (
-        f"{cognome} {secondo_cognome}"
-        .strip()
+        f"{cognome} {secondo_cognome}".strip()
     )
 
     upn = f"{sam}@consip.it"
@@ -956,7 +919,9 @@ if st.button(
         or "<data inizio>"
     )
 
-    persona_nome_file = nome_senza_esterno
+    persona_nome_file = (
+        nome_senza_esterno
+    )
 
     persona_nome_underscore = "_".join(
         part
@@ -1007,7 +972,7 @@ if st.button(
     # FILE 2 - CASELLA
     # ========================================================
     if email_flag:
-    
+
         casella_lines = [
             "Tipo Utenza --- Remota",
             f"Utenza --- {sam}",
@@ -1020,41 +985,42 @@ if st.button(
                 f"{sam}@consipspa.mail.onmicrosoft.com"
             )
         ]
-    
-        # ----------------------------------------------------
+
         # Eventuale profilazione SM
-        # ----------------------------------------------------
         if profilazione_sm and sm_lines:
-    
+
             casella_lines.append("")
-            casella_lines.append("Profilare su SM:")
-    
+            casella_lines.append(
+                "Profilare su SM:"
+            )
+
             for sm in sm_lines:
                 casella_lines.append(
                     f"- {sm}"
                 )
-    
+
         csv_casella = (
             "\n".join(
                 casella_lines
             )
             + "\n"
         )
-    
+
     else:
-    
+
         casella_lines = [
             "Casella Consip non richiesta",
             f"Utenza --- {sam}",
             f"Email esterna --- {custom_email}"
         ]
-    
+
         csv_casella = (
             "\n".join(
                 casella_lines
             )
             + "\n"
         )
+
     # ========================================================
     # FILE 3 - PROFILAZIONE GRUPPI AD
     # ========================================================
@@ -1104,8 +1070,10 @@ if st.button(
 
     row_gruppi_ad[0] = sam
 
-    inserimento_gruppo_index = HEADER_UTENTE.index(
-        "InserimentoGruppo"
+    inserimento_gruppo_index = (
+        HEADER_UTENTE.index(
+            "InserimentoGruppo"
+        )
     )
 
     row_gruppi_ad[
@@ -1155,7 +1123,6 @@ if st.button(
 
     # ========================================================
     # FILE 5 - COMPUTER
-    # Inserito nello ZIP ma non nella lista attività punto 02
     # ========================================================
     row_computer = [
         pc_asset,
@@ -1175,9 +1142,9 @@ if st.button(
         HEADER_COMPUTER
     )
 
-    # --------------------------------------------------------
-    # Nomi file
-    # --------------------------------------------------------
+    # ========================================================
+    # NOMI FILE
+    # ========================================================
     filename_utente = (
         f"1_{persona_nome_file}_utenza.csv"
     )
@@ -1202,14 +1169,14 @@ if st.button(
     )
 
     # ========================================================
-    # 01 - ASSEGNAZIONE ASSET
+    # GSI - ASSEGNAZIONE ASSET
     # ========================================================
-    subject_assegnazione_asset = (
+    subject_gsi = (
         "01 - Assegnazione Asset - "
         f"{cn} → GSI"
     )
 
-    message_assegnazione_asset = (
+    message_gsi = (
         "Per la nuova risorsa CONSULENTE "
         f"{cn} assegnare asset:\n"
         f"- PC Nome asset {pc_asset} "
@@ -1217,15 +1184,16 @@ if st.button(
     )
 
     # ========================================================
-    # 02 - PROVISIONING UTENTE
+    # GIIT - PROVISIONING UTENTE
+    # Tutte le attività GIIT sono accorpate
     # ========================================================
-    subject_provisioning = (
+    subject_giit = (
         "02 - Provisioning Utente "
         "(utenza/Casella/Profilazione) - "
         f"{cn} → GIIT"
     )
 
-    message_provisioning = (
+    message_giit = (
         "Ciao,\n"
         "si richiede di elaborare i file contenuti "
         "nella cartella compressa .zip "
@@ -1241,53 +1209,48 @@ if st.button(
     )
 
     # ========================================================
-    # 03 - PROVISIONING PC
-    # Nel testo viene usato il nome senza "(esterno)"
+    # GHDW
+    # Accorpamento:
+    # - Provisioning PC
+    # - File computer
+    # - Firma Asset
     # ========================================================
-    subject_provisioning_pc = (
-        "03 - Provisioning PC - "
+    subject_ghdw = (
+        "03 - Provisioning PC e Firma Asset - "
         f"{cn} → GHDW"
     )
 
-    message_provisioning_pc = (
+    message_ghdw = (
         "Ciao,\n"
         f"per {nome_senza_esterno} ritirare dal 599 "
         "per CONFIGURAZIONE i seguenti asset:\n"
         f"- PC Nome asset {pc_asset}\n"
         "\n"
-        f"la risorsa prende servizio "
-        f"{data_inizio_output}"
-    )
-
-    # ========================================================
-    # 09 - FIRMA ASSET
-    # ========================================================
-    subject_firma_asset = (
-        "09 - Firma Asset - "
-        f"{cn} → GHDW"
-    )
-
-    message_firma_asset = (
-        "Ciao,\n"
-        f"si richiede il giorno {data_inizio_output} "
-        "di far firmare gli asset ritirati dal 599 "
+        f"La risorsa prende servizio {data_inizio_output}.\n"
+        "\n"
+        "Attività da effettuare:\n"
+        f"1. Configurare il PC {pc_asset}.\n"
+        f"2. Elaborare il file {filename_computer} "
+        f"il giorno {data_inizio_output}.\n"
+        f"3. Il giorno {data_inizio_output} "
+        "far firmare gli asset ritirati dal 599 "
         f"per la consegna a {cn}, "
         f"Referente {manager_output}."
     )
 
     # ========================================================
     # GUIDA FLUSSO
-    # Contiene esclusivamente 01, 02, 03 e 09
+    # Raggruppata per area di competenza
     # ========================================================
     guida_flusso_lines = [
-        subject_assegnazione_asset,
-        message_assegnazione_asset,
-        subject_provisioning,
-        message_provisioning,
-        subject_provisioning_pc,
-        message_provisioning_pc,
-        subject_firma_asset,
-        message_firma_asset
+        subject_gsi,
+        message_gsi,
+
+        subject_giit,
+        message_giit,
+
+        subject_ghdw,
+        message_ghdw
     ]
 
     guida_flusso = "\n\n".join(
@@ -1330,8 +1293,6 @@ if st.button(
             csv_entraid
         )
 
-        # Il computer viene incluso nello ZIP,
-        # ma non compare nel testo operativo del punto 02
         zip_file.writestr(
             filename_computer,
             csv_computer
@@ -1350,38 +1311,40 @@ if st.button(
     )
 
     # ========================================================
-    # VISUALIZZAZIONE FLUSSO
+    # VISUALIZZAZIONE FLUSSO PER AREA DI COMPETENZA
     # ========================================================
 
-    # --------------------------------------------------------
-    # 01 - Assegnazione Asset
-    # --------------------------------------------------------
+    # ========================================================
+    # 01 - GSI
+    # ========================================================
     st.subheader(
-        subject_assegnazione_asset
+        subject_gsi
     )
 
     st.text(
-        message_assegnazione_asset
+        message_gsi
     )
 
     st.divider()
 
-    # --------------------------------------------------------
-    # 02 - Provisioning Utente
-    # --------------------------------------------------------
+    # ========================================================
+    # 02 - GIIT
+    # ========================================================
     st.subheader(
-        subject_provisioning
+        subject_giit
     )
 
     st.text(
-        message_provisioning
+        message_giit
     )
 
     st.markdown(
-        "**File collegati al punto 02:**"
+        "**File di competenza GIIT:**"
     )
 
-    # File 1
+    # --------------------------------------------------------
+    # File 1 - Utenza
+    # --------------------------------------------------------
     st.markdown(
         f"**1. {filename_utente}**"
     )
@@ -1402,7 +1365,9 @@ if st.button(
         key="download_utente"
     )
 
-    # File 2
+    # --------------------------------------------------------
+    # File 2 - Casella
+    # --------------------------------------------------------
     st.markdown(
         f"**2. {filename_casella}**"
     )
@@ -1419,7 +1384,9 @@ if st.button(
         key="download_casella"
     )
 
-    # File 3
+    # --------------------------------------------------------
+    # File 3 - Gruppi AD
+    # --------------------------------------------------------
     st.markdown(
         f"**3. {filename_gruppi_ad}**"
     )
@@ -1440,7 +1407,9 @@ if st.button(
         key="download_gruppi_ad"
     )
 
-    # File 4
+    # --------------------------------------------------------
+    # File 4 - Gruppi Entra ID
+    # --------------------------------------------------------
     st.markdown(
         f"**4. {filename_entraid}**"
     )
@@ -1457,38 +1426,9 @@ if st.button(
         key="download_entraid"
     )
 
-    # File 5 incluso nel bundle, ma non nella lista operativa
-    with st.expander(
-        "File tecnico aggiuntivo incluso nel bundle ZIP"
-    ):
-
-        st.markdown(
-            f"**{filename_computer}**"
-        )
-
-        st.info(
-            "Il file computer viene incluso nel bundle ZIP, "
-            "ma non viene indicato nella lista delle attività "
-            "da eseguire del punto 02."
-        )
-
-        st.dataframe(
-            pd.DataFrame(
-                [row_computer],
-                columns=HEADER_COMPUTER
-            ),
-            use_container_width=True
-        )
-
-        st.download_button(
-            "Scarica file Computer",
-            data=csv_computer,
-            file_name=filename_computer,
-            mime="text/csv",
-            key="download_computer"
-        )
-
-    # Bundle completo
+    # --------------------------------------------------------
+    # Bundle ZIP completo
+    # --------------------------------------------------------
     st.markdown(
         "**Bundle completo del provisioning:**"
     )
@@ -1503,28 +1443,44 @@ if st.button(
 
     st.divider()
 
-    # --------------------------------------------------------
-    # 03 - Provisioning PC
-    # --------------------------------------------------------
+    # ========================================================
+    # 03 - GHDW
+    # ========================================================
     st.subheader(
-        subject_provisioning_pc
+        subject_ghdw
     )
 
     st.text(
-        message_provisioning_pc
+        message_ghdw
     )
 
-    st.divider()
-
-    # --------------------------------------------------------
-    # 09 - Firma Asset
-    # --------------------------------------------------------
-    st.subheader(
-        subject_firma_asset
+    st.markdown(
+        "**File di competenza GHDW:**"
     )
 
-    st.text(
-        message_firma_asset
+    st.markdown(
+        f"**{filename_computer}**"
+    )
+
+    st.info(
+        f"Il file deve essere elaborato il "
+        f"{data_inizio_output}."
+    )
+
+    st.dataframe(
+        pd.DataFrame(
+            [row_computer],
+            columns=HEADER_COMPUTER
+        ),
+        use_container_width=True
+    )
+
+    st.download_button(
+        "Scarica 5 - Computer",
+        data=csv_computer,
+        file_name=filename_computer,
+        mime="text/csv",
+        key="download_computer"
     )
 
     st.success(
